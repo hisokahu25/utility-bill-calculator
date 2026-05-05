@@ -9,27 +9,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { residentialRates, commercialRates, calculateFromRates } from "@/data/rates";
+import { calculateFromRates, getRatesForMonthsForward } from "@/data/rates";
 
 type MeterStatus = "" | "working" | "not_working";
 type BillingType = "" | "with_sewage" | "without_sewage" | "average";
 type MeterType = "" | "residential" | "commercial";
-
-const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليه", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
-];
-
-function getMonthsList(count: number): { label: string; index: number }[] {
-  const now = new Date();
-  const result: { label: string; index: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const yr = d.getFullYear().toString().slice(-2);
-    result.push({ label: `${arabicMonths[d.getMonth()]}-${yr}`, index: i });
-  }
-  return result;
-}
 
 // ─── Tab 1: Settlement Calculator ───
 function SettlementTab() {
@@ -46,8 +30,7 @@ function SettlementTab() {
     if (meterStatus === "working") {
       if (billingType === "with_sewage" || billingType === "without_sewage") {
         if (!meterType) return null;
-        const rates = meterType === "residential" ? residentialRates : commercialRates;
-        return calculateFromRates(rates, monthCount, billingType);
+        return calculateFromRates(meterType as "residential" | "commercial", monthCount, billingType);
       }
       if (billingType === "average") {
         const avg = parseFloat(avgConsumption);
@@ -61,7 +44,6 @@ function SettlementTab() {
 
   return (
     <div className="space-y-5">
-      {/* Meter Status */}
       <Card>
         <CardHeader><CardTitle className="text-lg">حالة العداد</CardTitle></CardHeader>
         <CardContent>
@@ -192,23 +174,42 @@ function SettlementTab() {
 }
 
 // ─── Tab 2: Special Cases (غير سائر) ───
+interface SpecialRow {
+  month: string;
+  value: string;
+  practice: string;
+}
+
 function SpecialCasesTab() {
   const [months, setMonths] = useState("");
-  const [rows, setRows] = useState<{ month: string; value: string; practice: string }[]>([]);
+  const [activityType, setActivityType] = useState<MeterType>("");
+  const [rows, setRows] = useState<SpecialRow[]>([]);
 
   const monthCount = parseInt(months) || 0;
 
-  const handleMonthsChange = (val: string) => {
-    setMonths(val);
-    const count = parseInt(val) || 0;
-    const monthsList = getMonthsList(count);
+  const rebuildRows = (count: number, activity: string) => {
+    if (count <= 0 || !activity) {
+      setRows([]);
+      return;
+    }
+    const rates = getRatesForMonthsForward(count, activity as "residential" | "commercial");
     setRows(
-      monthsList.map((m, i) => ({
-        month: m.label,
-        value: rows[i]?.value || "",
-        practice: rows[i]?.practice || "",
+      rates.map((r, i) => ({
+        month: r.month,
+        value: rows[i]?.month === r.month ? rows[i].value : "",
+        practice: rows[i]?.month === r.month ? rows[i].practice : r.total.toString(),
       }))
     );
+  };
+
+  const handleMonthsChange = (val: string) => {
+    setMonths(val);
+    rebuildRows(parseInt(val) || 0, activityType);
+  };
+
+  const handleActivityChange = (val: string) => {
+    setActivityType(val as MeterType);
+    rebuildRows(monthCount, val);
   };
 
   const updateRow = (index: number, field: "value" | "practice", val: string) => {
@@ -224,6 +225,16 @@ function SpecialCasesTab() {
       <Card>
         <CardHeader><CardTitle className="text-lg">حالات خاصة للغير سائر</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">النشاط</label>
+            <Select value={activityType} onValueChange={handleActivityChange}>
+              <SelectTrigger><SelectValue placeholder="اختر النشاط" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="residential">منزلي</SelectItem>
+                <SelectItem value="commercial">تجاري</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold">عدد الشهور</label>
             <Input type="number" min={1} placeholder="أدخل عدد الشهور" value={months} onChange={(e) => handleMonthsChange(e.target.value)} />
@@ -249,30 +260,13 @@ function SpecialCasesTab() {
                     <tr key={i} className="border-t">
                       <td className="p-3 font-medium">{row.month}</td>
                       <td className="p-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          placeholder="0"
-                          value={row.value}
-                          onChange={(e) => updateRow(i, "value", e.target.value)}
-                          className="h-8 text-sm"
-                        />
+                        <Input type="number" min={0} step={0.01} placeholder="0" value={row.value} onChange={(e) => updateRow(i, "value", e.target.value)} className="h-8 text-sm" />
                       </td>
                       <td className="p-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          placeholder="0"
-                          value={row.practice}
-                          onChange={(e) => updateRow(i, "practice", e.target.value)}
-                          className="h-8 text-sm"
-                        />
+                        <Input type="number" min={0} step={0.01} placeholder="0" value={row.practice} onChange={(e) => updateRow(i, "practice", e.target.value)} className="h-8 text-sm" />
                       </td>
                     </tr>
                   ))}
-                  {/* Totals row */}
                   <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
                     <td className="p-3">الإجمالي</td>
                     <td className="p-3">{totalValue.toFixed(2)}</td>
@@ -282,7 +276,6 @@ function SpecialCasesTab() {
               </table>
             </div>
 
-            {/* Grand total */}
             <div className="mt-4 rounded-xl bg-primary/10 p-6 text-center">
               <p className="text-sm text-muted-foreground mb-1">الإجمالي الكلي</p>
               <p className="text-4xl font-bold text-primary">{grandTotal.toFixed(2)}</p>
@@ -300,7 +293,6 @@ export function SettlementCalculator() {
   return (
     <div dir="rtl" className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -311,7 +303,6 @@ export function SettlementCalculator() {
           <p className="text-muted-foreground">حساب تسويات المياه والصرف الصحي</p>
         </div>
 
-        {/* Tabs */}
         <Tabs defaultValue="settlement" className="w-full">
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="settlement">التسويات</TabsTrigger>
