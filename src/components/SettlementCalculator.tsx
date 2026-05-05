@@ -8,24 +8,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { residentialRates, commercialRates, calculateFromRates } from "@/data/rates";
 
 type MeterStatus = "" | "working" | "not_working";
 type BillingType = "" | "with_sewage" | "without_sewage" | "average";
 type MeterType = "" | "residential" | "commercial";
 
-export function SettlementCalculator() {
+const arabicMonths = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليه", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+function getMonthsList(count: number): { label: string; index: number }[] {
+  const now = new Date();
+  const result: { label: string; index: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const yr = d.getFullYear().toString().slice(-2);
+    result.push({ label: `${arabicMonths[d.getMonth()]}-${yr}`, index: i });
+  }
+  return result;
+}
+
+// ─── Tab 1: Settlement Calculator ───
+function SettlementTab() {
   const [meterStatus, setMeterStatus] = useState<MeterStatus>("");
-  const [months, setMonths] = useState<string>("");
+  const [months, setMonths] = useState("");
   const [billingType, setBillingType] = useState<BillingType>("");
   const [meterType, setMeterType] = useState<MeterType>("");
-  const [avgConsumption, setAvgConsumption] = useState<string>("");
-  const [tariff, setTariff] = useState<string>("");
+  const [avgConsumption, setAvgConsumption] = useState("");
+  const [tariff, setTariff] = useState("");
 
   const result = useMemo(() => {
     const monthCount = parseInt(months);
     if (!monthCount || monthCount <= 0) return null;
-
     if (meterStatus === "working") {
       if (billingType === "with_sewage" || billingType === "without_sewage") {
         if (!meterType) return null;
@@ -36,13 +53,250 @@ export function SettlementCalculator() {
         const avg = parseFloat(avgConsumption);
         const tar = parseFloat(tariff);
         if (!avg || !tar) return null;
-        const total = monthCount * avg * tar;
-        return { entries: [], total };
+        return { entries: [], total: monthCount * avg * tar };
       }
     }
     return null;
   }, [meterStatus, months, billingType, meterType, avgConsumption, tariff]);
 
+  return (
+    <div className="space-y-5">
+      {/* Meter Status */}
+      <Card>
+        <CardHeader><CardTitle className="text-lg">حالة العداد</CardTitle></CardHeader>
+        <CardContent>
+          <Select value={meterStatus} onValueChange={(v) => { setMeterStatus(v as MeterStatus); setBillingType(""); setMeterType(""); setMonths(""); setAvgConsumption(""); setTariff(""); }}>
+            <SelectTrigger><SelectValue placeholder="اختر حالة العداد" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="working">سائر وسليم</SelectItem>
+              <SelectItem value="not_working">غير سائر وتشرك</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {meterStatus === "working" && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg">بيانات التسوية</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">عدد الشهور</label>
+              <Input type="number" min={1} placeholder="أدخل عدد الشهور" value={months} onChange={(e) => setMonths(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">نوع الممارسة</label>
+              <Select value={billingType} onValueChange={(v) => { setBillingType(v as BillingType); setMeterType(""); setAvgConsumption(""); setTariff(""); }}>
+                <SelectTrigger><SelectValue placeholder="اختر نوع الممارسة" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="with_sewage">بصرف</SelectItem>
+                  <SelectItem value="without_sewage">بدون صرف</SelectItem>
+                  <SelectItem value="average">متوسط وفقاً للاستهلاك السابق</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(billingType === "with_sewage" || billingType === "without_sewage") && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">نوع العداد</label>
+                <Select value={meterType} onValueChange={(v) => setMeterType(v as MeterType)}>
+                  <SelectTrigger><SelectValue placeholder="اختر نوع العداد" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="residential">منزلي</SelectItem>
+                    <SelectItem value="commercial">تجاري</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {billingType === "average" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">متوسط الاستهلاك بالمتر المكعب</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل متوسط الاستهلاك" value={avgConsumption} onChange={(e) => setAvgConsumption(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">التعريفة (جنيه / م³)</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل التعريفة" value={tariff} onChange={(e) => setTariff(e.target.value)} />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {meterStatus === "not_working" && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-destructive shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p className="font-semibold">العداد غير سائر - يحتاج إلى تشريك أو استبدال</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {result && (
+        <Card className="border-primary/20 bg-primary/[0.03]">
+          <CardHeader><CardTitle className="text-lg text-primary">نتيجة التسوية</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl bg-primary/10 p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-1">إجمالي المبلغ المستحق</p>
+              <p className="text-4xl font-bold text-primary">{result.total.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground mt-1">جنيه</p>
+            </div>
+            {result.entries.length > 0 && (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="p-3 text-right font-semibold">الشهر</th>
+                      <th className="p-3 text-right font-semibold">مياه</th>
+                      <th className="p-3 text-right font-semibold">صرف</th>
+                      <th className="p-3 text-right font-semibold">مياه + صرف</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.entries.map((entry, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="p-3">{entry.month}</td>
+                        <td className="p-3">{entry.water}</td>
+                        <td className="p-3">{entry.sewage}</td>
+                        <td className="p-3 font-semibold">{entry.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {billingType === "average" && (
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">عدد الشهور</p>
+                  <p className="text-lg font-bold">{months}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">متوسط الاستهلاك</p>
+                  <p className="text-lg font-bold">{avgConsumption} م³</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">التعريفة</p>
+                  <p className="text-lg font-bold">{tariff} جنيه</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab 2: Special Cases (غير سائر) ───
+function SpecialCasesTab() {
+  const [months, setMonths] = useState("");
+  const [rows, setRows] = useState<{ month: string; value: string; practice: string }[]>([]);
+
+  const monthCount = parseInt(months) || 0;
+
+  const handleMonthsChange = (val: string) => {
+    setMonths(val);
+    const count = parseInt(val) || 0;
+    const monthsList = getMonthsList(count);
+    setRows(
+      monthsList.map((m, i) => ({
+        month: m.label,
+        value: rows[i]?.value || "",
+        practice: rows[i]?.practice || "",
+      }))
+    );
+  };
+
+  const updateRow = (index: number, field: "value" | "practice", val: string) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: val } : r)));
+  };
+
+  const totalValue = rows.reduce((sum, r) => sum + (parseFloat(r.value) || 0), 0);
+  const totalPractice = rows.reduce((sum, r) => sum + (parseFloat(r.practice) || 0), 0);
+  const grandTotal = totalValue + totalPractice;
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardHeader><CardTitle className="text-lg">حالات خاصة للغير سائر</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">عدد الشهور</label>
+            <Input type="number" min={1} placeholder="أدخل عدد الشهور" value={months} onChange={(e) => handleMonthsChange(e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {monthCount > 0 && rows.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg">بيانات الشهور</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-3 text-right font-semibold">الشهر</th>
+                    <th className="p-3 text-right font-semibold">القيمة</th>
+                    <th className="p-3 text-right font-semibold">ممارسة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="p-3 font-medium">{row.month}</td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          placeholder="0"
+                          value={row.value}
+                          onChange={(e) => updateRow(i, "value", e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          placeholder="0"
+                          value={row.practice}
+                          onChange={(e) => updateRow(i, "practice", e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totals row */}
+                  <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                    <td className="p-3">الإجمالي</td>
+                    <td className="p-3">{totalValue.toFixed(2)}</td>
+                    <td className="p-3">{totalPractice.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Grand total */}
+            <div className="mt-4 rounded-xl bg-primary/10 p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-1">الإجمالي الكلي</p>
+              <p className="text-4xl font-bold text-primary">{grandTotal.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground mt-1">جنيه</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───
+export function SettlementCalculator() {
   return (
     <div dir="rtl" className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -57,197 +311,19 @@ export function SettlementCalculator() {
           <p className="text-muted-foreground">حساب تسويات المياه والصرف الصحي</p>
         </div>
 
-        {/* Meter Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">حالة العداد</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Select
-              value={meterStatus}
-              onValueChange={(v) => {
-                setMeterStatus(v as MeterStatus);
-                setBillingType("");
-                setMeterType("");
-                setMonths("");
-                setAvgConsumption("");
-                setTariff("");
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="اختر حالة العداد" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="working">سائر وسليم</SelectItem>
-                <SelectItem value="not_working">غير سائر وتشرك</SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
-        {/* Working meter options */}
-        {meterStatus === "working" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">بيانات التسوية</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Number of months */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">عدد الشهور</label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="أدخل عدد الشهور"
-                  value={months}
-                  onChange={(e) => setMonths(e.target.value)}
-                />
-              </div>
-
-              {/* Billing type */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">نوع الممارسة</label>
-                <Select
-                  value={billingType}
-                  onValueChange={(v) => {
-                    setBillingType(v as BillingType);
-                    setMeterType("");
-                    setAvgConsumption("");
-                    setTariff("");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر نوع الممارسة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="with_sewage">بصرف</SelectItem>
-                    <SelectItem value="without_sewage">بدون صرف</SelectItem>
-                    <SelectItem value="average">متوسط وفقاً للاستهلاك السابق</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Meter type for ممارسة */}
-              {(billingType === "with_sewage" || billingType === "without_sewage") && (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground">نوع العداد</label>
-                  <Select value={meterType} onValueChange={(v) => setMeterType(v as MeterType)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر نوع العداد" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="residential">منزلي</SelectItem>
-                      <SelectItem value="commercial">تجاري</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Average consumption fields */}
-              {billingType === "average" && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">متوسط الاستهلاك بالمتر المكعب</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      placeholder="أدخل متوسط الاستهلاك"
-                      value={avgConsumption}
-                      onChange={(e) => setAvgConsumption(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">التعريفة (جنيه / م³)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      placeholder="أدخل التعريفة"
-                      value={tariff}
-                      onChange={(e) => setTariff(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Not working meter */}
-        {meterStatus === "not_working" && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                </svg>
-                <p className="font-semibold">العداد غير سائر - يحتاج إلى تشريك أو استبدال</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Results */}
-        {result && (
-          <Card className="border-primary/20 bg-primary/[0.03]">
-            <CardHeader>
-              <CardTitle className="text-lg text-primary">نتيجة التسوية</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Summary */}
-              <div className="rounded-xl bg-primary/10 p-6 text-center">
-                <p className="text-sm text-muted-foreground mb-1">إجمالي المبلغ المستحق</p>
-                <p className="text-4xl font-bold text-primary">{result.total.toFixed(2)}</p>
-                <p className="text-sm text-muted-foreground mt-1">جنيه</p>
-              </div>
-
-              {/* Breakdown table for rate-based */}
-              {result.entries.length > 0 && (
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="p-3 text-right font-semibold">الشهر</th>
-                        <th className="p-3 text-right font-semibold">مياه</th>
-                        <th className="p-3 text-right font-semibold">صرف</th>
-                        <th className="p-3 text-right font-semibold">مياه + صرف</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.entries.map((entry, i) => (
-                        <tr key={i} className="border-t">
-                          <td className="p-3">{entry.month}</td>
-                          <td className="p-3">{entry.water}</td>
-                          <td className="p-3">{entry.sewage}</td>
-                          <td className="p-3 font-semibold">{entry.total}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Average calculation breakdown */}
-              {billingType === "average" && (
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs text-muted-foreground">عدد الشهور</p>
-                    <p className="text-lg font-bold">{months}</p>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs text-muted-foreground">متوسط الاستهلاك</p>
-                    <p className="text-lg font-bold">{avgConsumption} م³</p>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs text-muted-foreground">التعريفة</p>
-                    <p className="text-lg font-bold">{tariff} جنيه</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Tabs */}
+        <Tabs defaultValue="settlement" className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="settlement">التسويات</TabsTrigger>
+            <TabsTrigger value="special">حالات خاصة للغير سائر</TabsTrigger>
+          </TabsList>
+          <TabsContent value="settlement">
+            <SettlementTab />
+          </TabsContent>
+          <TabsContent value="special">
+            <SpecialCasesTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
