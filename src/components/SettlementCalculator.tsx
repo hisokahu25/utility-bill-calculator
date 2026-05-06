@@ -58,7 +58,7 @@ function SettlementTab() {
       <Card>
         <CardHeader><CardTitle className="text-lg">حالة العداد</CardTitle></CardHeader>
         <CardContent>
-          <Select value={meterStatus} onValueChange={(v) => { setMeterStatus(v as MeterStatus); setBillingType(""); setMeterType(""); setMonths(""); setAvgConsumption(""); setTariff(""); }}>
+          <Select value={meterStatus} onValueChange={(v) => { setMeterStatus(v as MeterStatus); setBillingType(""); setMeterType(""); setMonths(""); setAvgConsumption(""); setTariff(""); setTamperingFee("500"); }}>
             <SelectTrigger><SelectValue placeholder="اختر حالة العداد" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="working">سائر وسليم</SelectItem>
