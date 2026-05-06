@@ -23,31 +23,42 @@ function SettlementTab() {
   const [meterType, setMeterType] = useState<MeterType>("");
   const [avgConsumption, setAvgConsumption] = useState("");
   const [tariff, setTariff] = useState("");
+  const [tamperingFee, setTamperingFee] = useState("500");
 
   const result = useMemo(() => {
     const monthCount = parseInt(months);
     if (!monthCount || monthCount <= 0) return null;
-    if (meterStatus === "working") {
+    const tampering = parseFloat(tamperingFee) || 0;
+
+    if (meterStatus === "working" || meterStatus === "not_working") {
       if (billingType === "with_sewage" || billingType === "without_sewage") {
         if (!meterType) return null;
-        return calculateFromRates(meterType as "residential" | "commercial", monthCount, billingType);
+        const calc = calculateFromRates(meterType as "residential" | "commercial", monthCount, billingType);
+        if (meterStatus === "not_working") {
+          return { ...calc, tampering, total: calc.total + tampering };
+        }
+        return calc;
       }
       if (billingType === "average") {
         const avg = parseFloat(avgConsumption);
         const tar = parseFloat(tariff);
         if (!avg || !tar) return null;
-        return { entries: [], total: monthCount * avg * tar };
+        const base = monthCount * avg * tar;
+        if (meterStatus === "not_working") {
+          return { entries: [], tampering, total: base + tampering };
+        }
+        return { entries: [], total: base };
       }
     }
     return null;
-  }, [meterStatus, months, billingType, meterType, avgConsumption, tariff]);
+  }, [meterStatus, months, billingType, meterType, avgConsumption, tariff, tamperingFee]);
 
   return (
     <div className="space-y-5">
       <Card>
         <CardHeader><CardTitle className="text-lg">حالة العداد</CardTitle></CardHeader>
         <CardContent>
-          <Select value={meterStatus} onValueChange={(v) => { setMeterStatus(v as MeterStatus); setBillingType(""); setMeterType(""); setMonths(""); setAvgConsumption(""); setTariff(""); }}>
+          <Select value={meterStatus} onValueChange={(v) => { setMeterStatus(v as MeterStatus); setBillingType(""); setMeterType(""); setMonths(""); setAvgConsumption(""); setTariff(""); setTamperingFee("500"); }}>
             <SelectTrigger><SelectValue placeholder="اختر حالة العداد" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="working">سائر وسليم</SelectItem>
@@ -106,12 +117,50 @@ function SettlementTab() {
 
       {meterStatus === "not_working" && (
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-destructive shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-              <p className="font-semibold">العداد غير سائر - يحتاج إلى تشريك أو استبدال</p>
+          <CardHeader><CardTitle className="text-lg">بيانات التسوية (غير سائر)</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">عدد الشهور</label>
+              <Input type="number" min={1} placeholder="أدخل عدد الشهور" value={months} onChange={(e) => setMonths(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">نوع الممارسة</label>
+              <Select value={billingType} onValueChange={(v) => { setBillingType(v as BillingType); setMeterType(""); setAvgConsumption(""); setTariff(""); }}>
+                <SelectTrigger><SelectValue placeholder="اختر نوع الممارسة" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="with_sewage">بصرف</SelectItem>
+                  <SelectItem value="without_sewage">بدون صرف</SelectItem>
+                  <SelectItem value="average">متوسط وفقاً للاستهلاك السابق</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(billingType === "with_sewage" || billingType === "without_sewage") && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">نوع العداد</label>
+                <Select value={meterType} onValueChange={(v) => setMeterType(v as MeterType)}>
+                  <SelectTrigger><SelectValue placeholder="اختر نوع العداد" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="residential">منزلي</SelectItem>
+                    <SelectItem value="commercial">تجاري</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {billingType === "average" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">متوسط الاستهلاك بالمتر المكعب</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل متوسط الاستهلاك" value={avgConsumption} onChange={(e) => setAvgConsumption(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">التعريفة (جنيه / م³)</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل التعريفة" value={tariff} onChange={(e) => setTariff(e.target.value)} />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">قيمة العبث (جنيه)</label>
+              <Input type="number" min={0} step={1} placeholder="500" value={tamperingFee} onChange={(e) => setTamperingFee(e.target.value)} />
             </div>
           </CardContent>
         </Card>
@@ -164,6 +213,12 @@ function SettlementTab() {
                   <p className="text-xs text-muted-foreground">التعريفة</p>
                   <p className="text-lg font-bold">{tariff} جنيه</p>
                 </div>
+              </div>
+            )}
+            {meterStatus === "not_working" && "tampering" in result && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
+                <p className="text-xs text-muted-foreground mb-1">قيمة العبث</p>
+                <p className="text-2xl font-bold text-destructive">{(result as any).tampering.toFixed(2)} جنيه</p>
               </div>
             )}
           </CardContent>
