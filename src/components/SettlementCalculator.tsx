@@ -23,24 +23,35 @@ function SettlementTab() {
   const [meterType, setMeterType] = useState<MeterType>("");
   const [avgConsumption, setAvgConsumption] = useState("");
   const [tariff, setTariff] = useState("");
+  const [tamperingFee, setTamperingFee] = useState("500");
 
   const result = useMemo(() => {
     const monthCount = parseInt(months);
     if (!monthCount || monthCount <= 0) return null;
-    if (meterStatus === "working") {
+    const tampering = parseFloat(tamperingFee) || 0;
+
+    if (meterStatus === "working" || meterStatus === "not_working") {
       if (billingType === "with_sewage" || billingType === "without_sewage") {
         if (!meterType) return null;
-        return calculateFromRates(meterType as "residential" | "commercial", monthCount, billingType);
+        const calc = calculateFromRates(meterType as "residential" | "commercial", monthCount, billingType);
+        if (meterStatus === "not_working") {
+          return { ...calc, tampering, total: calc.total + tampering };
+        }
+        return calc;
       }
       if (billingType === "average") {
         const avg = parseFloat(avgConsumption);
         const tar = parseFloat(tariff);
         if (!avg || !tar) return null;
-        return { entries: [], total: monthCount * avg * tar };
+        const base = monthCount * avg * tar;
+        if (meterStatus === "not_working") {
+          return { entries: [], tampering, total: base + tampering };
+        }
+        return { entries: [], total: base };
       }
     }
     return null;
-  }, [meterStatus, months, billingType, meterType, avgConsumption, tariff]);
+  }, [meterStatus, months, billingType, meterType, avgConsumption, tariff, tamperingFee]);
 
   return (
     <div className="space-y-5">
