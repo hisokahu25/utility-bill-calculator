@@ -215,6 +215,12 @@ function SettlementTab() {
                 </div>
               </div>
             )}
+            {meterStatus === "not_working" && result.tampering !== undefined && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
+                <p className="text-xs text-muted-foreground mb-1">قيمة العبث</p>
+                <p className="text-2xl font-bold text-destructive">{result.tampering.toFixed(2)} جنيه</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
