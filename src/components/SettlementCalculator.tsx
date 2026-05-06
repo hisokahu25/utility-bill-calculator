@@ -106,12 +106,50 @@ function SettlementTab() {
 
       {meterStatus === "not_working" && (
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-destructive shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-              <p className="font-semibold">العداد غير سائر - يحتاج إلى تشريك أو استبدال</p>
+          <CardHeader><CardTitle className="text-lg">بيانات التسوية (غير سائر)</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">عدد الشهور</label>
+              <Input type="number" min={1} placeholder="أدخل عدد الشهور" value={months} onChange={(e) => setMonths(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">نوع الممارسة</label>
+              <Select value={billingType} onValueChange={(v) => { setBillingType(v as BillingType); setMeterType(""); setAvgConsumption(""); setTariff(""); }}>
+                <SelectTrigger><SelectValue placeholder="اختر نوع الممارسة" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="with_sewage">بصرف</SelectItem>
+                  <SelectItem value="without_sewage">بدون صرف</SelectItem>
+                  <SelectItem value="average">متوسط وفقاً للاستهلاك السابق</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(billingType === "with_sewage" || billingType === "without_sewage") && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">نوع العداد</label>
+                <Select value={meterType} onValueChange={(v) => setMeterType(v as MeterType)}>
+                  <SelectTrigger><SelectValue placeholder="اختر نوع العداد" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="residential">منزلي</SelectItem>
+                    <SelectItem value="commercial">تجاري</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {billingType === "average" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">متوسط الاستهلاك بالمتر المكعب</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل متوسط الاستهلاك" value={avgConsumption} onChange={(e) => setAvgConsumption(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">التعريفة (جنيه / م³)</label>
+                  <Input type="number" min={0} step={0.01} placeholder="أدخل التعريفة" value={tariff} onChange={(e) => setTariff(e.target.value)} />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">قيمة العبث (جنيه)</label>
+              <Input type="number" min={0} step={1} placeholder="500" value={tamperingFee} onChange={(e) => setTamperingFee(e.target.value)} />
             </div>
           </CardContent>
         </Card>
