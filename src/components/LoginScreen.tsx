@@ -7,8 +7,11 @@ interface LoginScreenProps {
   onLogin: () => void;
 }
 
-const CREDENTIALS = { username: "admin", password: "204060" };
-
+// سنقرأ القيم من متغيرات البيئة، وإذا لم تكن موجودة سنستخدم القيم الافتراضية
+const CREDENTIALS = { 
+  username: import.meta.env.VITE_APP_USERNAME || "admin", 
+  password: import.meta.env.VITE_APP_PASSWORD || "204060" 
+};
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
