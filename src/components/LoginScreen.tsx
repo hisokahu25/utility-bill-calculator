@@ -7,7 +7,7 @@ interface LoginScreenProps {
   onLogin: () => void;
 }
 
-const CREDENTIALS = { username: "admin", password: "admin" };
+const CREDENTIALS = { username: "admin", password: "204060" };
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [username, setUsername] = useState("");
